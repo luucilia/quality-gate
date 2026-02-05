@@ -20,14 +20,17 @@ jobs:
             "https://api.github.com/user/repos?per_page=100&visibility=all&affiliation=owner" \
             | jq -r '.[].clone_url' > repos.txt
       
-      - name: Clonar repositórios
+      - name: Clonar repositórios (com acesso a privados)
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           mkdir repos
           while read repo; do
             name=$(basename "$repo" .git)
-            git clone "$repo" "repos/$name" || true
+            auth_repo=$(echo "$repo" | sed "s|https://|https://$GH_TOKEN@|")
+            git clone "$auth_repo" "repos/$name"
           done < repos.txt
-
+          
       - name: Criar CSV
         run: |
           echo "repo,linguagem,versao_atual,versao_minima,status" > inventory.csv
