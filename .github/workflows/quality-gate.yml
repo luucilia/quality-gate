@@ -48,35 +48,39 @@ jobs:
             cd "$repo"
       
             # -------------------
-            # JAVA (Maven / Gradle)
+            # JAVA (recursivo)
             # -------------------
-            if [ -f "pom.xml" ]; then
+            pom=$(find . -name pom.xml | head -n 1)
+      
+            if [ -n "$pom" ]; then
               language="Java"
-              version=$(grep -oPm1 "(?<=<java.version>)[^<]+" pom.xml || true)
               baseline="$baseline_java"
-            elif [ -f "build.gradle" ] || [ -f "gradle.properties" ]; then
-              language="Java"
-              version=$(grep -oPm1 "(?<=sourceCompatibility = ')[^']+" build.gradle gradle.properties 2>/dev/null || true)
-              baseline="$baseline_java"
+      
+              version=$(grep -oPm1 "(?<=<java.version>)[^<]+" "$pom" \
+                || grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" "$pom" \
+                || true)
+      
+              if [ -n "$version" ]; then
+                status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+                [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+              fi
             fi
       
             # -------------------
-            # DOTNET
+            # DOTNET (recursivo)
             # -------------------
-            if [ -f "global.json" ]; then
-              language=".NET"
-              version=$(jq -r '.sdk.version' global.json)
-              baseline="$baseline_dotnet"
-            elif ls *.csproj *.fsproj *.vbproj 1> /dev/null 2>&1; then
-              language=".NET"
-              version=$(grep -oPm1 "(?<=<TargetFramework>net)[^<]+" *.csproj *.fsproj *.vbproj 2>/dev/null || true)
-              baseline="$baseline_dotnet"
-            fi
+            dotnet=$(find . -name "*.csproj" -o -name "global.json" | head -n 1)
       
-            # -------------------
-            # COMPARAÇÃO
-            # -------------------
-            if [ "$version" != "N/A" ] && [ "$baseline" != "N/A" ]; then
+            if [ -n "$dotnet" ]; then
+              language=".NET"
+              baseline="$baseline_dotnet"
+      
+              if [[ "$dotnet" == *global.json ]]; then
+                version=$(jq -r '.sdk.version' "$dotnet")
+              else
+                version=$(grep -oPm1 "(?<=<TargetFramework>net)[^<]+" "$dotnet")
+              fi
+      
               status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
               [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
             fi
@@ -84,8 +88,8 @@ jobs:
             cd ../..
       
             echo "$name,$language,$version,$baseline,$result" >> inventory.csv
-          done        
-
+          done
+        
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
