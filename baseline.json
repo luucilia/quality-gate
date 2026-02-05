@@ -1,8 +1,4 @@
 {
-  "python": "3.12",
-  "node": "20",
   "java": "17",
-  "postgres": "14",
-  "mysql": "8"
+  "dotnet": "8.0"
 }
-
