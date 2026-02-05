@@ -41,31 +41,57 @@ jobs:
             tree=$(curl -s -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/${{ github.repository_owner }}/$repo/git/trees/$branch?recursive=1")
 
-            # -------------------
-            # JAVA
-            # -------------------
-            pom_path=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 'pom.xml' || true)
-
-            if [ -n "$pom_path" ]; then
-              language="Java"
-              baseline="$baseline_java"
-
-              pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
-                "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$pom_path?ref=$branch")
-
-              content=$(echo "$pom" | jq -r '.content' | base64 -d)
-
-              version=$(echo "$content" | grep -oPm1 "(?<=<java.version>)[^<]+" \
-                || echo "$content" | grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" \
-                || echo "NAO_DECLARADA")
-
-              if [ "$version" = "NAO_DECLARADA" ]; then
-                result="ABAIXO"
-              else
-                status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
-                [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+              # -------------------
+              # JAVA (Spring / Quarkus / Legacy)
+              # -------------------
+              
+              pom_path=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 'pom.xml' || true)
+              
+              java_found=false
+              
+              if [ -n "$pom_path" ]; then
+                java_found=true
+                language="Java"
+                baseline="$baseline_java"
+              
+                pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                  "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$pom_path?ref=$branch")
+              
+                content=$(echo "$pom" | jq -r '.content' | base64 -d)
+              
+                # Ordem REAL de prioridade
+                version=$(
+                  echo "$content" | grep -oPm1 "(?<=<java.version>)[^<]+" ||
+                  echo "$content" | grep -oPm1 "(?<=<maven.compiler.release>)[^<]+" ||
+                  echo "$content" | grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" ||
+                  echo "NAO_DECLARADA"
+                )
+              
+                # Normaliza Java 1.8 → 8
+                version=$(echo "$version" | sed 's/^1\.//')
+              
+                if [ "$version" = "NAO_DECLARADA" ]; then
+                  result="ABAIXO"
+                else
+                  status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+                  [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+                fi
               fi
-            fi
+              
+              # -------------------
+              # JAVA LEGADO (sem build)
+              # -------------------
+              
+              if [ "$java_found" = false ]; then
+                java_files=$(echo "$tree" | jq -r '.tree[].path' | grep '\.java$' || true)
+              
+                if [ -n "$java_files" ]; then
+                  language="Java-LEGACY"
+                  version="N/A"
+                  baseline="$baseline_java"
+                  result="ABAIXO"
+                fi
+              fi                
 
             # -------------------
             # DOTNET
@@ -81,7 +107,7 @@ jobs:
 
               content=$(echo "$proj" | jq -r '.content' | base64 -d)
 
-              version=$(echo "$content" | grep -oPm1 "(?<=<TargetFramework>net)[^<]+" || echo "NAO_DECLARADA")
+              version=$(echo "$content" | grep -oPm1 "(?<=<TargetFramework>net)[0-9.]+" | sed 's/\.0$//' || echo "NAO_DECLARADA")
 
               if [ "$version" = "NAO_DECLARADA" ]; then
                 result="ABAIXO"
