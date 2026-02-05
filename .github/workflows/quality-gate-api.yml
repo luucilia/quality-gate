@@ -14,7 +14,7 @@ jobs:
       - name: Criar CSV
         run: echo "repo,linguagem,versao_atual,versao_minima,status" > inventory.csv
 
-      - name: Quality Gate via GitHub API
+      - name: Quality Gate via GitHub API (recursivo)
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -26,22 +26,32 @@ jobs:
             "https://api.github.com/user/repos?per_page=100&visibility=all&affiliation=owner")
 
           echo "$repos" | jq -r '.[].name' | while read repo; do
-            echo "Processando $repo"
+            echo "🔍 Processando $repo"
 
             language="DESCONHECIDO"
             version="N/A"
             baseline="N/A"
             result="N/A"
 
-            # -----------------------
-            # JAVA — pom.xml
-            # -----------------------
-            pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/pom.xml")
+            # Branch default
+            branch=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/$repo" \
+              | jq -r '.default_branch')
 
-            if echo "$pom" | jq -e '.content' >/dev/null 2>&1; then
+            tree=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/$repo/git/trees/$branch?recursive=1")
+
+            # -------------------
+            # JAVA
+            # -------------------
+            pom_path=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 'pom.xml' || true)
+
+            if [ -n "$pom_path" ]; then
               language="Java"
               baseline="$baseline_java"
+
+              pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$pom_path?ref=$branch")
 
               content=$(echo "$pom" | jq -r '.content' | base64 -d)
 
@@ -57,21 +67,28 @@ jobs:
               fi
             fi
 
-            # -----------------------
-            # DOTNET — global.json
-            # -----------------------
-            global=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/global.json")
+            # -------------------
+            # DOTNET
+            # -------------------
+            csproj=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 '\.csproj$' || true)
 
-            if echo "$global" | jq -e '.content' >/dev/null 2>&1; then
+            if [ -n "$csproj" ]; then
               language=".NET"
               baseline="$baseline_dotnet"
 
-              content=$(echo "$global" | jq -r '.content' | base64 -d)
-              version=$(echo "$content" | jq -r '.sdk.version')
+              proj=$(curl -s -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$csproj?ref=$branch")
 
-              status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
-              [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+              content=$(echo "$proj" | jq -r '.content' | base64 -d)
+
+              version=$(echo "$content" | grep -oPm1 "(?<=<TargetFramework>net)[^<]+" || echo "NAO_DECLARADA")
+
+              if [ "$version" = "NAO_DECLARADA" ]; then
+                result="ABAIXO"
+              else
+                status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+                [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+              fi
             fi
 
             echo "$repo,$language,$version,$baseline,$result" >> inventory.csv
