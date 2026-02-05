@@ -1,0 +1,27 @@
+name: Quality Gate
+
+on:
+  workflow_dispatch:
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Criar CSV inicial
+        run: |
+          echo "repo,linguagem,versao_atual,versao_minima,status,frameworks,banco" > inventory.csv
+
+      - name: Exemplo
+        run: |
+          echo "exemplo-repo,Python,3.11,3.12,ABAIXO,Django,Postgres" >> inventory.csv
+
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory
+          path: inventory.csv
+
