@@ -1,0 +1,85 @@
+name: Quality Gate (GitHub API)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do quality-gate
+        uses: actions/checkout@v4
+
+      - name: Criar CSV
+        run: echo "repo,linguagem,versao_atual,versao_minima,status" > inventory.csv
+
+      - name: Quality Gate via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          baseline_java=$(jq -r '.java' baseline.json)
+          baseline_dotnet=$(jq -r '.dotnet' baseline.json)
+
+          repos=$(curl -s \
+            -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/user/repos?per_page=100&visibility=all&affiliation=owner")
+
+          echo "$repos" | jq -r '.[].name' | while read repo; do
+            echo "Processando $repo"
+
+            language="DESCONHECIDO"
+            version="N/A"
+            baseline="N/A"
+            result="N/A"
+
+            # -----------------------
+            # JAVA — pom.xml
+            # -----------------------
+            pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/pom.xml")
+
+            if echo "$pom" | jq -e '.content' >/dev/null 2>&1; then
+              language="Java"
+              baseline="$baseline_java"
+
+              content=$(echo "$pom" | jq -r '.content' | base64 -d)
+
+              version=$(echo "$content" | grep -oPm1 "(?<=<java.version>)[^<]+" \
+                || echo "$content" | grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" \
+                || echo "NAO_DECLARADA")
+
+              if [ "$version" = "NAO_DECLARADA" ]; then
+                result="ABAIXO"
+              else
+                status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+                [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+              fi
+            fi
+
+            # -----------------------
+            # DOTNET — global.json
+            # -----------------------
+            global=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/global.json")
+
+            if echo "$global" | jq -e '.content' >/dev/null 2>&1; then
+              language=".NET"
+              baseline="$baseline_dotnet"
+
+              content=$(echo "$global" | jq -r '.content' | base64 -d)
+              version=$(echo "$content" | jq -r '.sdk.version')
+
+              status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+              [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+            fi
+
+            echo "$repo,$language,$version,$baseline,$result" >> inventory.csv
+          done
+
+      - name: Upload CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-inventory
+          path: inventory.csv
+
