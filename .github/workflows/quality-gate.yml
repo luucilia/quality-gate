@@ -51,31 +51,9 @@ jobs:
             cd "$repo"
       
             # -------------------
-            # JAVA (recursivo)
-            # -------------------
-            pom=$(find . -name pom.xml | head -n 1)
-      
-            if [ -n "$pom" ]; then
-              language="Java"
-              baseline="$baseline_java"
-
-              version=$(grep -oPm1 "(?<=<java.version>)[^<]+" "$pom" \
-                || grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" "$pom" \
-                || true)
-
-              if [ -z "$version" ]; then
-                version="NAO_DECLARADA"
-                result="ABAIXO"
-              else
-                status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
-                [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
-              fi
-            fi
-
-            # -------------------
             # DOTNET (recursivo)
             # -------------------
-            dotnet=$(find . -name "*.csproj" -o -name "global.json" | head -n 1)
+            dotnet=$(find . \( -name "*.csproj" -o -name "global.json" \) | head -n 1)
       
             if [ -n "$dotnet" ]; then
               language=".NET"
@@ -89,13 +67,49 @@ jobs:
       
               status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
               [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+      
+            else
+              # -------------------
+              # JAVA COM BUILD
+              # -------------------
+              pom=$(find . -name pom.xml | head -n 1)
+      
+              if [ -n "$pom" ]; then
+                language="Java"
+                baseline="$baseline_java"
+      
+                version=$(grep -oPm1 "(?<=<java.version>)[^<]+" "$pom" \
+                  || grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" "$pom" \
+                  || true)
+      
+                if [ -z "$version" ]; then
+                  version="NAO_DECLARADA"
+                  result="ABAIXO"
+                else
+                  status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+                  [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+                fi
+      
+              else
+                # -------------------
+                # JAVA SEM BUILD
+                # -------------------
+                java_files=$(find . -name "*.java" | head -n 1)
+      
+                if [ -n "$java_files" ]; then
+                  language="Java"
+                  baseline="$baseline_java"
+                  version="SEM_BUILD"
+                  result="OK"
+                fi
+              fi
             fi
       
             cd ../..
       
             echo "$name,$language,$version,$baseline,$result" >> inventory.csv
           done
-        
+          
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
