@@ -32,43 +32,43 @@ jobs:
         run: |
           echo "repo,linguagem,versao_atual,versao_minima,status" > inventory.csv
   
-          - name: Detectar runtimes
-          run: |
-            baseline_python=$(jq -r '.python' baseline.json)
-            baseline_node=$(jq -r '.node' baseline.json)
-            baseline_java=$(jq -r '.java' baseline.json)
-  
-            for repo in repos/*; do
-              name=$(basename "$repo")
-  
-              cd "$repo"
-  
-              # PYTHON
-              if [ -f ".python-version" ] || [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
-                version=$(python --version 2>&1 | awk '{print $2}')
-                status=$(printf '%s\n%s' "$baseline_python" "$version" | sort -V | head -n1)
-                [ "$status" != "$baseline_python" ] && result="ABAIXO" || result="OK"
-                echo "$name,Python,$version,$baseline_python,$result" >> ../../inventory.csv
-              fi
-  
-              # NODE
-              if [ -f "package.json" ]; then
-                version=$(node -v | sed 's/v//')
-                status=$(printf '%s\n%s' "$baseline_node" "$version" | sort -V | head -n1)
-                [ "$status" != "$baseline_node" ] && result="ABAIXO" || result="OK"
-                echo "$name,Node,$version,$baseline_node,$result" >> ../../inventory.csv
-              fi
-  
-              # JAVA
-              if [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
-                version=$(java -version 2>&1 | head -n1 | grep -o '[0-9]\+')
-                status=$(printf '%s\n%s' "$baseline_java" "$version" | sort -V | head -n1)
-                [ "$status" != "$baseline_java" ] && result="ABAIXO" || result="OK"
-                echo "$name,Java,$version,$baseline_java,$result" >> ../../inventory.csv
-              fi
-  
-              cd ../..
-            done
+      - name: Detectar runtimes
+        run: |
+          baseline_python=$(jq -r '.python' baseline.json)
+          baseline_node=$(jq -r '.node' baseline.json)
+          baseline_java=$(jq -r '.java' baseline.json)
+
+          for repo in repos/*; do
+            name=$(basename "$repo")
+
+            cd "$repo"
+
+            # PYTHON
+            if [ -f ".python-version" ] || [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
+              version=$(python --version 2>&1 | awk '{print $2}')
+              status=$(printf '%s\n%s' "$baseline_python" "$version" | sort -V | head -n1)
+              [ "$status" != "$baseline_python" ] && result="ABAIXO" || result="OK"
+              echo "$name,Python,$version,$baseline_python,$result" >> ../../inventory.csv
+            fi
+
+            # NODE
+            if [ -f "package.json" ]; then
+              version=$(node -v | sed 's/v//')
+              status=$(printf '%s\n%s' "$baseline_node" "$version" | sort -V | head -n1)
+              [ "$status" != "$baseline_node" ] && result="ABAIXO" || result="OK"
+              echo "$name,Node,$version,$baseline_node,$result" >> ../../inventory.csv
+            fi
+
+            # JAVA
+            if [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
+              version=$(java -version 2>&1 | head -n1 | grep -o '[0-9]\+')
+              status=$(printf '%s\n%s' "$baseline_java" "$version" | sort -V | head -n1)
+              [ "$status" != "$baseline_java" ] && result="ABAIXO" || result="OK"
+              echo "$name,Java,$version,$baseline_java,$result" >> ../../inventory.csv
+            fi
+
+            cd ../..
+          done
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
