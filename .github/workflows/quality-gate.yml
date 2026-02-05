@@ -11,15 +11,15 @@ jobs:
       - name: Checkout do quality-gate
         uses: actions/checkout@v4
 
-      - name: Baixar lista de repositórios
+      - name: Baixar lista de repositórios (públicos + privados)
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           curl -s \
             -H "Authorization: token $GH_TOKEN" \
-            https://api.github.com/user/repos?per_page=100 \
+            "https://api.github.com/user/repos?per_page=100&visibility=all&affiliation=owner" \
             | jq -r '.[].clone_url' > repos.txt
-
+      
       - name: Clonar repositórios
         run: |
           mkdir repos
@@ -55,17 +55,20 @@ jobs:
             if [ -n "$pom" ]; then
               language="Java"
               baseline="$baseline_java"
-      
+
               version=$(grep -oPm1 "(?<=<java.version>)[^<]+" "$pom" \
                 || grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" "$pom" \
                 || true)
-      
-              if [ -n "$version" ]; then
+
+              if [ -z "$version" ]; then
+                version="NAO_DECLARADA"
+                result="ABAIXO"
+              else
                 status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
                 [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
               fi
             fi
-      
+
             # -------------------
             # DOTNET (recursivo)
             # -------------------
