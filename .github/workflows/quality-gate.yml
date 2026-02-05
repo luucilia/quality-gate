@@ -16,9 +16,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           curl -s \
-          -H "Authorization: token $GH_TOKEN" \
-          https://api.github.com/user/repos?per_page=100 \
-          | jq -r '.[].clone_url' > repos.txt
+            -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/user/repos?per_page=100 \
+            | jq -r '.[].clone_url' > repos.txt
 
       - name: Clonar repositórios
         run: |
@@ -31,48 +31,63 @@ jobs:
       - name: Criar CSV
         run: |
           echo "repo,linguagem,versao_atual,versao_minima,status" > inventory.csv
-  
-      - name: Detectar runtimes
-        run: |
-          baseline_python=$(jq -r '.python' baseline.json)
-          baseline_node=$(jq -r '.node' baseline.json)
-          baseline_java=$(jq -r '.java' baseline.json)
 
+      - name: Detectar Java e .NET
+        run: |
+          baseline_java=$(jq -r '.java' baseline.json)
+          baseline_dotnet=$(jq -r '.dotnet' baseline.json)
+      
           for repo in repos/*; do
             name=$(basename "$repo")
-
+      
+            language="DESCONHECIDO"
+            version="N/A"
+            baseline="N/A"
+            result="N/A"
+      
             cd "$repo"
-
-            # PYTHON
-            if [ -f ".python-version" ] || [ -f "pyproject.toml" ] || [ -f "requirements.txt" ]; then
-              version=$(python --version 2>&1 | awk '{print $2}')
-              status=$(printf '%s\n%s' "$baseline_python" "$version" | sort -V | head -n1)
-              [ "$status" != "$baseline_python" ] && result="ABAIXO" || result="OK"
-              echo "$name,Python,$version,$baseline_python,$result" >> ../../inventory.csv
+      
+            # -------------------
+            # JAVA (Maven / Gradle)
+            # -------------------
+            if [ -f "pom.xml" ]; then
+              language="Java"
+              version=$(grep -oPm1 "(?<=<java.version>)[^<]+" pom.xml || true)
+              baseline="$baseline_java"
+            elif [ -f "build.gradle" ] || [ -f "gradle.properties" ]; then
+              language="Java"
+              version=$(grep -oPm1 "(?<=sourceCompatibility = ')[^']+" build.gradle gradle.properties 2>/dev/null || true)
+              baseline="$baseline_java"
             fi
-
-            # NODE
-            if [ -f "package.json" ]; then
-              version=$(node -v | sed 's/v//')
-              status=$(printf '%s\n%s' "$baseline_node" "$version" | sort -V | head -n1)
-              [ "$status" != "$baseline_node" ] && result="ABAIXO" || result="OK"
-              echo "$name,Node,$version,$baseline_node,$result" >> ../../inventory.csv
+      
+            # -------------------
+            # DOTNET
+            # -------------------
+            if [ -f "global.json" ]; then
+              language=".NET"
+              version=$(jq -r '.sdk.version' global.json)
+              baseline="$baseline_dotnet"
+            elif ls *.csproj *.fsproj *.vbproj 1> /dev/null 2>&1; then
+              language=".NET"
+              version=$(grep -oPm1 "(?<=<TargetFramework>net)[^<]+" *.csproj *.fsproj *.vbproj 2>/dev/null || true)
+              baseline="$baseline_dotnet"
             fi
-
-            # JAVA
-            if [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
-              version=$(java -version 2>&1 | head -n1 | grep -o '[0-9]\+')
-              status=$(printf '%s\n%s' "$baseline_java" "$version" | sort -V | head -n1)
-              [ "$status" != "$baseline_java" ] && result="ABAIXO" || result="OK"
-              echo "$name,Java,$version,$baseline_java,$result" >> ../../inventory.csv
+      
+            # -------------------
+            # COMPARAÇÃO
+            # -------------------
+            if [ "$version" != "N/A" ] && [ "$baseline" != "N/A" ]; then
+              status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
+              [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
             fi
-
+      
             cd ../..
-          done
+      
+            echo "$name,$language,$version,$baseline,$result" >> inventory.csv
+          done        
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
           name: quality-gate-inventory
-          path: inventory.csv           
- 
+          path: inventory.csv
