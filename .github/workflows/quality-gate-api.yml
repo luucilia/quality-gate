@@ -45,6 +45,8 @@ jobs:
             baseline_target="N/A"
             result="N/A"
 
+            TECH_DETECTED=false
+
             # Branch default
             branch=$(curl -s -H "Authorization: token $GH_TOKEN" \
               "https://api.github.com/repos/${{ github.repository_owner }}/$repo" \
@@ -61,13 +63,12 @@ jobs:
               
               java_found=false
               
-              if [ -n "$pom_path" ]; then
-                java_found=true
+              if [ -n "$pom_path" ] && [ "$TECH_DETECTED" = false ]; then
+                TECH_DETECTED=true
                 language="Java"
                 baseline_min="$baseline_java_min"
                 baseline_target="$baseline_java_target"
-
-              
+            
                 pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
                   "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$pom_path?ref=$branch")
               
@@ -101,32 +102,31 @@ jobs:
               # JAVA LEGADO (sem build)
               # -------------------
               
-              if [ "$java_found" = false ]; then
+              if [ "$TECH_DETECTED" = false ]; then
                 java_files=$(echo "$tree" | jq -r '.tree[].path' | grep '\.java$' || true)
               
                 if [ -n "$java_files" ]; then
+                  TECH_DETECTED=true
                   language="Java-LEGACY"
                   version="N/A"
                   baseline_min="$baseline_java_min"
                   baseline_target="$baseline_java_target"
                   result="ABAIXO"
                 fi
-              fi                
+              fi
+                             
 
             # -------------------
             # DOTNET
             # -------------------
-            csproj=$(echo "$tree" | jq -r '.tree[].path' \
-            | grep '\.csproj$' \
-            | grep -v '^\.github/' \
-            | grep -v '^docs/' \
-            | head -n1 || true)
-                        
-            if [ -n "$csproj" ] && [ "$language" = "DESCONHECIDO" ]; then
+            csproj=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 '\.csproj$' || true)
+
+            if [ -n "$csproj" ] && [ "$TECH_DETECTED" = false ]; then
+              TECH_DETECTED=true
               language=".NET"
               baseline_min="$baseline_dotnet_min"
               baseline_target="$baseline_dotnet_target"
-                
+                 
               proj=$(curl -s -H "Authorization: token $GH_TOKEN" \
                 "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$csproj?ref=$branch")
 
@@ -145,6 +145,14 @@ jobs:
                   result="OK"
                 fi
               fi
+            fi
+
+            if [ "$TECH_DETECTED" = false ]; then
+              language="DESCONHECIDO"
+              version="N/A"
+              baseline_min="N/A"
+              baseline_target="N/A"
+              result="N/A"
             fi
 
             echo "$ORG,$repo,$language,$version,$baseline_min/$baseline_target,$result,$DATA_EXECUCAO" >> "$CSV_PATH"
