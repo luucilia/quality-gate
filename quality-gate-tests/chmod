@@ -1,0 +1,1 @@
+tests/test_csv_exists.sh fixtures/csv_ok.csv

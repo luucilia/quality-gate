@@ -1,0 +1,5 @@
+org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao
+luucilia,rest-api,Java,17,11,25,OK,2026-02-06
+luucilia,legacy-app,Java-LEGACY,N/A,11,25,ABAIXO,2026-02-06
+luucilia,api-dotnet,.NET,6,6,8,OK,2026-02-06
+
