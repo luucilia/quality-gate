@@ -1,0 +1,12 @@
+org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao
+luucilia,blog_paperclip,DESCONHECIDO,N/A,/,N/A,2026-02-06
+luucilia,Github-dependabot,DESCONHECIDO,N/A,/,N/A,2026-02-06
+luucilia,hello-world,DESCONHECIDO,N/A,/,N/A,2026-02-06
+luucilia,ObjectOrientedEssentials,Java-LEGACY,N/A,11/25,ABAIXO,2026-02-06
+luucilia,PMPE,DESCONHECIDO,N/A,11/25,N/A,2026-02-06
+luucilia,quality-gate,DESCONHECIDO,N/A,11/25,N/A,2026-02-06
+luucilia,rest-spring-boot,Java,17,11/25,ABAIXO_TARGET,2026-02-06
+luucilia,rest-with-spring-boot-and-java-erudio,DESCONHECIDO,N/A,11/25,N/A,2026-02-06
+luucilia,uploader_carrierwave,DESCONHECIDO,N/A,11/25,N/A,2026-02-06
+luucilia,uploader_paperclip,DESCONHECIDO,N/A,11/25,N/A,2026-02-06
+luucilia,uploader_shrine,DESCONHECIDO,N/A,11/25,N/A,2026-02-06
