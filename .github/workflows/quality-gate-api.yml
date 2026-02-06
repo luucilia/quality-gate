@@ -37,11 +37,12 @@ jobs:
             "https://api.github.com/user/repos?per_page=100&visibility=all&affiliation=owner")
 
           echo "$repos" | jq -r '.[].name' | while read repo; do
-            echo "🔍 Processando $repo"
+            echo "Processando $repo"
 
             language="DESCONHECIDO"
             version="N/A"
-            baseline="N/A"
+            baseline_min="N/A"
+            baseline_target="N/A"
             result="N/A"
 
             # Branch default
