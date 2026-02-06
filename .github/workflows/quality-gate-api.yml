@@ -157,11 +157,13 @@ jobs:
           git config user.name "quality-gate-bot"
           git config user.email "quality-gate@github.com"
       
-          git pull --rebase origin master
-      
           git add results/
           git commit -m "Quality Gate results - $(date -u +'%Y-%m-%d')" || echo "Nada para commitar"
+      
+          git pull --rebase origin master
           git push
+        
+        
         
         
 
