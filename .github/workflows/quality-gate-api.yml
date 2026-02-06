@@ -3,6 +3,9 @@ name: Quality Gate (GitHub API)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+    
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
@@ -154,7 +157,7 @@ jobs:
           git config user.email "quality-gate@github.com"
       
           git add results/
-          git commit -m "Quality Gate results - $(date -u +'%Y-%m-%d')" || echo "Nada para commitar"
+          git commit -m "Quality Gate results - $(date -u +'%Y-%m-%d')" || echo "have nothing to commit"
           git push
         
 
