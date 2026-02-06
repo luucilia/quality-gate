@@ -116,13 +116,17 @@ jobs:
             # -------------------
             # DOTNET
             # -------------------
-            csproj=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 '\.csproj$' || true)
-
-            if [ -n "$csproj" ]; then
+            csproj=$(echo "$tree" | jq -r '.tree[].path' \
+            | grep '\.csproj$' \
+            | grep -v '^\.github/' \
+            | grep -v '^docs/' \
+            | head -n1 || true)
+                        
+            if [ -n "$csproj" ] && [ "$language" = "DESCONHECIDO" ]; then
               language=".NET"
               baseline_min="$baseline_dotnet_min"
               baseline_target="$baseline_dotnet_target"
-
+                
               proj=$(curl -s -H "Authorization: token $GH_TOKEN" \
                 "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$csproj?ref=$branch")
 
