@@ -11,16 +11,24 @@ jobs:
       - name: Checkout do quality-gate
         uses: actions/checkout@v4
 
-      - name: Criar CSV
-        run: echo "repo,linguagem,versao_atual,versao_minima,status" > inventory.csv
-
       - name: Quality Gate via GitHub API (recursivo)
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          baseline_java=$(jq -r '.java' baseline.json)
-          baseline_dotnet=$(jq -r '.dotnet' baseline.json)
-
+          DATA_EXECUCAO=$(date -u +"%Y-%m-%d")
+          ORG="${{ github.repository_owner }}"
+          
+          mkdir -p results/$DATA_EXECUCAO
+          CSV_PATH="results/$DATA_EXECUCAO/inventory.csv"
+          
+          echo "org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao" > "$CSV_PATH"
+        
+          baseline_java_min=$(jq -r '.java.min' baselines/baseline.json)
+          baseline_java_target=$(jq -r '.java.target' baselines/baseline.json)
+          
+          baseline_dotnet_min=$(jq -r '.dotnet.min' baselines/baseline.json)
+          baseline_dotnet_target=$(jq -r '.dotnet.target' baselines/baseline.json)
+          
           repos=$(curl -s \
             -H "Authorization: token $GH_TOKEN" \
             "https://api.github.com/user/repos?per_page=100&visibility=all&affiliation=owner")
@@ -52,7 +60,9 @@ jobs:
               if [ -n "$pom_path" ]; then
                 java_found=true
                 language="Java"
-                baseline="$baseline_java"
+                baseline_min="$baseline_java_min"
+                baseline_target="$baseline_java_target"
+
               
                 pom=$(curl -s -H "Authorization: token $GH_TOKEN" \
                   "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$pom_path?ref=$branch")
@@ -73,8 +83,13 @@ jobs:
                 if [ "$version" = "NAO_DECLARADA" ]; then
                   result="ABAIXO"
                 else
-                  status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
-                  [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+                  if [ "$(printf '%s\n%s' "$baseline_java_min" "$version" | sort -V | head -n1)" != "$baseline_java_min" ]; then
+                    result="ABAIXO_MINIMO"
+                  elif [ "$(printf '%s\n%s' "$baseline_java_target" "$version" | sort -V | head -n1)" != "$baseline_java_target" ]; then
+                    result="ABAIXO_TARGET"
+                  else
+                    result="OK"
+                  fi             
                 fi
               fi
               
@@ -88,7 +103,8 @@ jobs:
                 if [ -n "$java_files" ]; then
                   language="Java-LEGACY"
                   version="N/A"
-                  baseline="$baseline_java"
+                  baseline_min="$baseline_java_min"
+                  baseline_target="$baseline_java_target"
                   result="ABAIXO"
                 fi
               fi                
@@ -100,7 +116,8 @@ jobs:
 
             if [ -n "$csproj" ]; then
               language=".NET"
-              baseline="$baseline_dotnet"
+              baseline_min="$baseline_dotnet_min"
+              baseline_target="$baseline_dotnet_target"
 
               proj=$(curl -s -H "Authorization: token $GH_TOKEN" \
                 "https://api.github.com/repos/${{ github.repository_owner }}/$repo/contents/$csproj?ref=$branch")
@@ -112,17 +129,32 @@ jobs:
               if [ "$version" = "NAO_DECLARADA" ]; then
                 result="ABAIXO"
               else
-                status=$(printf '%s\n%s' "$baseline" "$version" | sort -V | head -n1)
-                [ "$status" != "$baseline" ] && result="ABAIXO" || result="OK"
+                if [ "$(printf '%s\n%s' "$baseline_min" "$version" | sort -V | head -n1)" != "$baseline_min" ]; then
+                  result="ABAIXO_MINIMO"
+                elif [ "$(printf '%s\n%s' "$baseline_target" "$version" | sort -V | head -n1)" != "$baseline_target" ]; then
+                  result="ABAIXO_TARGET"
+                else
+                  result="OK"
+                fi
               fi
             fi
 
-            echo "$repo,$language,$version,$baseline,$result" >> inventory.csv
+            echo "$ORG,$repo,$language,$version,$baseline_min/$baseline_target,$result,$DATA_EXECUCAO" >> "$CSV_PATH"
           done
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
           name: quality-gate-inventory
-          path: inventory.csv
+          path: results/
+
+      - name: Commitar resultados
+        run: |
+          git config user.name "quality-gate-bot"
+          git config user.email "quality-gate@github.com"
+      
+          git add results/
+          git commit -m "Quality Gate results - $(date -u +'%Y-%m-%d')" || echo "Nada para commitar"
+          git push
+        
 
