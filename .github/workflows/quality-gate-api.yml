@@ -91,9 +91,11 @@ jobs:
                   echo "$content" | grep -oPm1 "(?<=<maven.compiler.release>)[^<]+" ||
                   echo "$content" | grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" ||
                   echo "$content" | grep -oPm1 "(?<=<maven.compiler.target>)[^<]+" ||
+                  echo "$content" | grep -oPm1 "(?<=<source>)[^<]+" ||
+                  echo "$content" | grep -oPm1 "(?<=<target>)[^<]+" ||
                   echo "NAO_DECLARADA"
-                )                
-              
+                )
+                                            
                 # Normaliza Java 1.8 → 8
                 version=$(echo "$version" | sed 's/^1\.//')
               
