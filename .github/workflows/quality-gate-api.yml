@@ -19,13 +19,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           DATA_EXECUCAO=$(date -u +"%Y-%m-%d")
+          echo "DATA_EXECUCAO=$DATA_EXECUCAO" >> $GITHUB_ENV
+      
           ORG="${{ github.repository_owner }}"
           
           mkdir -p results/$DATA_EXECUCAO
           CSV_PATH="results/$DATA_EXECUCAO/inventory.csv"
           
           echo "org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao" > "$CSV_PATH"
-        
+              
           baseline_java_min=$(jq -r '.java.min' baselines/baseline.json)
           baseline_java_target=$(jq -r '.java.target' baselines/baseline.json)
           
@@ -173,6 +175,7 @@ jobs:
         with:
           name: inventory-${{ github.run_id }}
           path: results/${{ env.DATA_EXECUCAO }}/inventory.csv
+          if-no-files-found: error
         
       - name: Commitar resultados
         run: |
