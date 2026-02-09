@@ -66,7 +66,11 @@ jobs:
               # JAVA (Spring / Quarkus / Legacy)
               # -------------------
               
-              pom_path=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 'pom.xml' || true)
+              pom_path=$(
+                echo "$tree" | jq -r '.tree[].path' \
+                | grep '^pom.xml$' \
+                || echo "$tree" | jq -r '.tree[].path' | grep 'pom.xml' | sort | head -n1
+              )
               
               java_found=false
               
@@ -86,8 +90,9 @@ jobs:
                   echo "$content" | grep -oPm1 "(?<=<java.version>)[^<]+" ||
                   echo "$content" | grep -oPm1 "(?<=<maven.compiler.release>)[^<]+" ||
                   echo "$content" | grep -oPm1 "(?<=<maven.compiler.source>)[^<]+" ||
+                  echo "$content" | grep -oPm1 "(?<=<maven.compiler.target>)[^<]+" ||
                   echo "NAO_DECLARADA"
-                )
+                )                
               
                 # Normaliza Java 1.8 → 8
                 version=$(echo "$version" | sed 's/^1\.//')
