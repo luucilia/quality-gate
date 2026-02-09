@@ -119,9 +119,19 @@ jobs:
             # -------------------
             # DOTNET
             # -------------------
-            csproj=$(echo "$tree" | jq -r '.tree[].path' | grep -m1 '\.csproj$' || true)
-
+              csproj=$(echo "$tree" | jq -r '.tree[].path' \
+              | grep -v '^\.github/' \
+              | grep -v '^docs/' \
+              | grep -v '^scripts/' \
+              | grep -m1 '\.csproj$' || true)
+            
             if [ -n "$csproj" ] && [ "$TECH_DETECTED" = false ]; then
+              
+              if [ "$repo" = "quality-gate" ]; then
+                echo "$ORG,$repo,DESCONHECIDO,N/A,N/A,N/A,N/A,$DATA_EXECUCAO" >> "$CSV_PATH"
+                continue
+              fi
+
               TECH_DETECTED=true
               language=".NET"
               baseline_min="$baseline_dotnet_min"
@@ -155,7 +165,7 @@ jobs:
               result="N/A"
             fi
 
-            echo "$ORG,$repo,$language,$version,$baseline_min/$baseline_target,$result,$DATA_EXECUCAO" >> "$CSV_PATH"
+            echo "$ORG,$repo,$language,$version,$baseline_min,$baseline_target,$result,$DATA_EXECUCAO" >> "$CSV_PATH"
           done
 
       - name: Upload CSV
