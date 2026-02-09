@@ -39,6 +39,11 @@ jobs:
           echo "$repos" | jq -r '.[].name' | while read repo; do
             echo "Processando $repo"
 
+            if [ "$repo" = "quality-gate" ]; then
+              echo "$ORG,$repo,DESCONHECIDO,N/A,N/A,N/A,N/A,$DATA_EXECUCAO" >> "$CSV_PATH"
+              continue
+            fi
+
             language="DESCONHECIDO"
             version="N/A"
             baseline_min="N/A"
@@ -126,11 +131,6 @@ jobs:
               | grep -m1 '\.csproj$' || true)
             
             if [ -n "$csproj" ] && [ "$TECH_DETECTED" = false ]; then
-              
-              if [ "$repo" = "quality-gate" ]; then
-                echo "$ORG,$repo,DESCONHECIDO,N/A,N/A,N/A,N/A,$DATA_EXECUCAO" >> "$CSV_PATH"
-                continue
-              fi
 
               TECH_DETECTED=true
               language=".NET"
