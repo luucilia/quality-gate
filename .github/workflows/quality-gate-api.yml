@@ -168,12 +168,12 @@ jobs:
             echo "$ORG,$repo,$language,$version,$baseline_min,$baseline_target,$result,$DATA_EXECUCAO" >> "$CSV_PATH"
           done
 
-      - name: Upload CSV
+      - name: Upload inventory CSV (somente da execução)
         uses: actions/upload-artifact@v4
         with:
-          name: quality-gate-inventory
-          path: results/
-
+          name: inventory-${{ github.run_id }}
+          path: results/${{ env.DATA_EXECUCAO }}/inventory.csv
+        
       - name: Commitar resultados
         run: |
           git config user.name "quality-gate-bot"
