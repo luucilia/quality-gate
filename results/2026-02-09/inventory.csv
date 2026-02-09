@@ -1,6 +1,9 @@
 org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao
+luucilia,ASPNETCore-NTier-Template,.NET,8,6.0,10.0,ABAIXO_TARGET,2026-02-09
 luucilia,blog_paperclip,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
+luucilia,Design-Patterns-csharp,.NET,,6.0,10.0,OK,2026-02-09
 luucilia,eps-payments-banking-service-integration-template,Java,8,11,25,ABAIXO_MINIMO,2026-02-09
+luucilia,fireplace-api,.NET,7,6.0,10.0,ABAIXO_TARGET,2026-02-09
 luucilia,Github-dependabot,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,hello-world,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,java-example,Java,17,11,25,ABAIXO_TARGET,2026-02-09
@@ -15,4 +18,5 @@ luucilia,spring-data-examples,Java,25,11,25,OK,2026-02-09
 luucilia,uploader_carrierwave,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,uploader_paperclip,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,uploader_shrine,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
+luucilia,Wix4BurnTutorial,.NET,8,6.0,10.0,ABAIXO_TARGET,2026-02-09
 luucilia,yas,Java,21,11,25,ABAIXO_TARGET,2026-02-09
