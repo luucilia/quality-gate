@@ -10,8 +10,8 @@ luucilia,proxy_pattern,Java,NAO_DECLARADA,11,25,ABAIXO,2026-02-09
 luucilia,quality-gate,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,rest-spring-boot,Java,17,11,25,ABAIXO_TARGET,2026-02-09
 luucilia,rest-with-spring-boot-and-java-erudio,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
-luucilia,spring-data-examples,Java,NAO_DECLARADA,11,25,ABAIXO,2026-02-09
+luucilia,spring-data-examples,Java,25,11,25,OK,2026-02-09
 luucilia,uploader_carrierwave,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,uploader_paperclip,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
 luucilia,uploader_shrine,DESCONHECIDO,N/A,N/A,N/A,N/A,2026-02-09
-luucilia,yas,Java,NAO_DECLARADA,11,25,ABAIXO,2026-02-09
+luucilia,yas,Java,21,11,25,ABAIXO_TARGET,2026-02-09
