@@ -15,46 +15,47 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Quality Gate via GitHub Script
+        id: quality
         uses: actions/github-script@v7
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
         with:
           script: |
             const fs = require('fs');
             const path = require('path');
 
-            const dataExecucao = new Date().toISOString().split('T')[0];
             const org = context.repo.owner;
+            const dataExecucao = new Date().toISOString().split('T')[0];
 
             const resultsDir = `results/${dataExecucao}`;
             fs.mkdirSync(resultsDir, { recursive: true });
 
             const csvPath = `${resultsDir}/inventory.csv`;
 
-            // Cabeçalho CSV
-            let csv = "org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao\n";
+            // Header CSV
+            fs.writeFileSync(csvPath, "org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao\n");
 
             // Baselines
-            const baselines = JSON.parse(fs.readFileSync('baselines/baseline.json', 'utf-8'));
+            const baseline = JSON.parse(fs.readFileSync('baselines/baseline.json'));
 
-            const baselineJavaMin = baselines.java.min;
-            const baselineJavaTarget = baselines.java.target;
+            const javaMin = baseline.java.min;
+            const javaTarget = baseline.java.target;
+            const dotnetMin = baseline.dotnet.min;
+            const dotnetTarget = baseline.dotnet.target;
 
-            const baselineDotnetMin = baselines.dotnet.min;
-            const baselineDotnetTarget = baselines.dotnet.target;
-
-            // Buscar repos
+            // 🔥 Paginação automática
             const repos = await github.paginate(
-              github.rest.repos.listForAuthenticatedUser,
-              { per_page: 100 }
+              github.rest.repos.listForOrg,
+              {
+                org,
+                per_page: 100
+              }
             );
 
-            for (const repo of repos) {
-              const repoName = repo.name;
-              console.log(`Processando ${repoName}`);
+            for (const repoObj of repos) {
+              const repo = repoObj.name;
+              console.log(`Processando ${repo}`);
 
-              if (repoName === "quality-gate") {
-                csv += `${org},${repoName},DESCONHECIDO,N/A,N/A,N/A,N/A,${dataExecucao}\n`;
+              if (repo === "quality-gate") {
+                fs.appendFileSync(csvPath, `${org},${repo},DESCONHECIDO,N/A,N/A,N/A,N/A,${dataExecucao}\n`);
                 continue;
               }
 
@@ -63,37 +64,40 @@ jobs:
               let baselineMin = "N/A";
               let baselineTarget = "N/A";
               let result = "N/A";
-
               let techDetected = false;
 
-              const defaultBranch = repo.default_branch;
+              // Default branch
+              const repoData = await github.rest.repos.get({
+                owner: org,
+                repo
+              });
 
-              // Tree recursiva
+              const branch = repoData.data.default_branch;
+
+              // Tree
               const tree = await github.rest.git.getTree({
                 owner: org,
-                repo: repoName,
-                tree_sha: defaultBranch,
+                repo,
+                tree_sha: branch,
                 recursive: "1"
               });
 
               const paths = tree.data.tree.map(t => t.path);
 
-              // -------------------
-              // JAVA
-              // -------------------
-              const pomPath = paths.find(p => p.endsWith('pom.xml'));
+              // ---------------- JAVA ----------------
+              const pomPath = paths.find(p => p === "pom.xml") || paths.find(p => p.includes("pom.xml"));
 
               if (pomPath && !techDetected) {
                 techDetected = true;
                 language = "Java";
-                baselineMin = baselineJavaMin;
-                baselineTarget = baselineJavaTarget;
+                baselineMin = javaMin;
+                baselineTarget = javaTarget;
 
                 const file = await github.rest.repos.getContent({
                   owner: org,
-                  repo: repoName,
+                  repo,
                   path: pomPath,
-                  ref: defaultBranch
+                  ref: branch
                 });
 
                 const content = Buffer.from(file.data.content, 'base64').toString();
@@ -104,84 +108,86 @@ jobs:
                 };
 
                 version =
-                  extract(/<java.version>(.*?)</) ||
-                  extract(/<maven.compiler.release>(.*?)</) ||
-                  extract(/<maven.compiler.source>(.*?)</) ||
-                  extract(/<maven.compiler.target>(.*?)</) ||
-                  extract(/<source>(.*?)</) ||
-                  extract(/<target>(.*?)</) ||
+                  extract(/<java.version>(.*?)<\/java.version>/) ||
+                  extract(/<maven.compiler.release>(.*?)<\/maven.compiler.release>/) ||
+                  extract(/<maven.compiler.source>(.*?)<\/maven.compiler.source>/) ||
+                  extract(/<maven.compiler.target>(.*?)<\/maven.compiler.target>/) ||
+                  extract(/<source>(.*?)<\/source>/) ||
+                  extract(/<target>(.*?)<\/target>/) ||
                   "NAO_DECLARADA";
 
                 version = version.replace(/^1\./, '');
 
                 if (version === "NAO_DECLARADA") {
                   result = "ABAIXO";
-                } else if (version < baselineMin) {
+                } else if (version < javaMin) {
                   result = "ABAIXO_MINIMO";
-                } else if (version < baselineTarget) {
+                } else if (version < javaTarget) {
                   result = "ABAIXO_TARGET";
                 } else {
                   result = "OK";
                 }
               }
 
-              // -------------------
-              // JAVA LEGACY
-              // -------------------
+              // -------- JAVA LEGACY --------
               if (!techDetected && paths.some(p => p.endsWith('.java'))) {
                 techDetected = true;
                 language = "Java-LEGACY";
-                baselineMin = baselineJavaMin;
-                baselineTarget = baselineJavaTarget;
+                baselineMin = javaMin;
+                baselineTarget = javaTarget;
                 result = "ABAIXO";
               }
 
-              // -------------------
-              // DOTNET
-              // -------------------
-              const csproj = paths.find(p => p.endsWith('.csproj'));
+              // ---------------- DOTNET ----------------
+              const csproj = paths.find(p =>
+                p.endsWith(".csproj") &&
+                !p.startsWith(".github/") &&
+                !p.startsWith("docs/") &&
+                !p.startsWith("scripts/")
+              );
 
               if (csproj && !techDetected) {
                 techDetected = true;
                 language = ".NET";
-                baselineMin = baselineDotnetMin;
-                baselineTarget = baselineDotnetTarget;
+                baselineMin = dotnetMin;
+                baselineTarget = dotnetTarget;
 
                 const file = await github.rest.repos.getContent({
                   owner: org,
-                  repo: repoName,
+                  repo,
                   path: csproj,
-                  ref: defaultBranch
+                  ref: branch
                 });
 
                 const content = Buffer.from(file.data.content, 'base64').toString();
 
-                const match = content.match(/<TargetFramework>net(.*?)</);
-                version = match ? match[1].replace('.0','') : "NAO_DECLARADA";
+                const match = content.match(/<TargetFramework>net([0-9.]+)<\/TargetFramework>/);
+                version = match ? match[1].replace(/\.0$/, '') : "NAO_DECLARADA";
 
                 if (version === "NAO_DECLARADA") {
                   result = "ABAIXO";
-                } else if (version < baselineMin) {
+                } else if (version < dotnetMin) {
                   result = "ABAIXO_MINIMO";
-                } else if (version < baselineTarget) {
+                } else if (version < dotnetTarget) {
                   result = "ABAIXO_TARGET";
                 } else {
                   result = "OK";
                 }
               }
 
-              csv += `${org},${repoName},${language},${version},${baselineMin},${baselineTarget},${result},${dataExecucao}\n`;
+              fs.appendFileSync(
+                csvPath,
+                `${org},${repo},${language},${version},${baselineMin},${baselineTarget},${result},${dataExecucao}\n`
+              );
             }
-
-            fs.writeFileSync(csvPath, csv);
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
         with:
           name: inventory-${{ github.run_id }}
-          path: results/**/inventory.csv
+          path: results/
 
-      - name: Commitar resultados
+      - name: Commit results
         run: |
           git config user.name "quality-gate-bot"
           git config user.email "quality-gate@github.com"
