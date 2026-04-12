@@ -41,11 +41,9 @@ jobs:
             const dotnetMin = baseline.dotnet.min;
             const dotnetTarget = baseline.dotnet.target;
 
-            // 🔥 Paginação automática
             const repos = await github.paginate(
-              github.rest.repos.listForOrg,
+              github.rest.repos.listForAuthenticatedUser,
               {
-                org,
                 per_page: 100
               }
             );
