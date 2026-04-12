@@ -18,166 +18,167 @@ jobs:
         id: quality
         uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.GH_PAT }}
           script: |
             const fs = require('fs');
             const path = require('path');
-
-            const org = context.repo.owner;
-            const dataExecucao = new Date().toISOString().split('T')[0];
-
-            const resultsDir = `results/${dataExecucao}`;
-            fs.mkdirSync(resultsDir, { recursive: true });
-
-            const csvPath = `${resultsDir}/inventory.csv`;
-
-            // Header CSV
-            fs.writeFileSync(csvPath, "org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao\n");
-
-            // Baselines
-            const baseline = JSON.parse(fs.readFileSync('baselines/baseline.json'));
-
-            const javaMin = baseline.java.min;
-            const javaTarget = baseline.java.target;
-            const dotnetMin = baseline.dotnet.min;
-            const dotnetTarget = baseline.dotnet.target;
-
-            const repos = await github.paginate(
-              github.rest.repos.listForAuthenticatedUser,
-              {
-                per_page: 100
-              }
-            );
-
-            for (const repoObj of repos) {
-              const repo = repoObj.name;
-              console.log(`Processando ${repo}`);
-
-              if (repo === "quality-gate") {
-                fs.appendFileSync(csvPath, `${org},${repo},DESCONHECIDO,N/A,N/A,N/A,N/A,${dataExecucao}\n`);
-                continue;
-              }
-
-              let language = "DESCONHECIDO";
-              let version = "N/A";
-              let baselineMin = "N/A";
-              let baselineTarget = "N/A";
-              let result = "N/A";
-              let techDetected = false;
-
-              // Default branch
-              const repoData = await github.rest.repos.get({
-                owner: org,
-                repo
-              });
-
-              const branch = repoData.data.default_branch;
-
-              // Tree
-              const tree = await github.rest.git.getTree({
-                owner: org,
-                repo,
-                tree_sha: branch,
-                recursive: "1"
-              });
-
-              const paths = tree.data.tree.map(t => t.path);
-
-              // ---------------- JAVA ----------------
-              const pomPath = paths.find(p => p === "pom.xml") || paths.find(p => p.includes("pom.xml"));
-
-              if (pomPath && !techDetected) {
-                techDetected = true;
-                language = "Java";
-                baselineMin = javaMin;
-                baselineTarget = javaTarget;
-
-                const file = await github.rest.repos.getContent({
+  
+              const org = context.repo.owner;
+              const dataExecucao = new Date().toISOString().split('T')[0];
+  
+              const resultsDir = `results/${dataExecucao}`;
+              fs.mkdirSync(resultsDir, { recursive: true });
+  
+              const csvPath = `${resultsDir}/inventory.csv`;
+  
+              // Header CSV
+              fs.writeFileSync(csvPath, "org,repo,linguagem,versao_atual,baseline_min,baseline_target,status,data_execucao\n");
+  
+              // Baselines
+              const baseline = JSON.parse(fs.readFileSync('baselines/baseline.json'));
+  
+              const javaMin = baseline.java.min;
+              const javaTarget = baseline.java.target;
+              const dotnetMin = baseline.dotnet.min;
+              const dotnetTarget = baseline.dotnet.target;
+  
+              const repos = await github.paginate(
+                github.rest.repos.listForAuthenticatedUser,
+                {
+                  per_page: 100
+                }
+              );
+  
+              for (const repoObj of repos) {
+                const repo = repoObj.name;
+                console.log(`Processando ${repo}`);
+  
+                if (repo === "quality-gate") {
+                  fs.appendFileSync(csvPath, `${org},${repo},DESCONHECIDO,N/A,N/A,N/A,N/A,${dataExecucao}\n`);
+                  continue;
+                }
+  
+                let language = "DESCONHECIDO";
+                let version = "N/A";
+                let baselineMin = "N/A";
+                let baselineTarget = "N/A";
+                let result = "N/A";
+                let techDetected = false;
+  
+                // Default branch
+                const repoData = await github.rest.repos.get({
+                  owner: org,
+                  repo
+                });
+  
+                const branch = repoData.data.default_branch;
+  
+                // Tree
+                const tree = await github.rest.git.getTree({
                   owner: org,
                   repo,
-                  path: pomPath,
-                  ref: branch
+                  tree_sha: branch,
+                  recursive: "1"
                 });
-
-                const content = Buffer.from(file.data.content, 'base64').toString();
-
-                const extract = (regex) => {
-                  const match = content.match(regex);
-                  return match ? match[1] : null;
-                };
-
-                version =
-                  extract(/<java.version>(.*?)<\/java.version>/) ||
-                  extract(/<maven.compiler.release>(.*?)<\/maven.compiler.release>/) ||
-                  extract(/<maven.compiler.source>(.*?)<\/maven.compiler.source>/) ||
-                  extract(/<maven.compiler.target>(.*?)<\/maven.compiler.target>/) ||
-                  extract(/<source>(.*?)<\/source>/) ||
-                  extract(/<target>(.*?)<\/target>/) ||
-                  "NAO_DECLARADA";
-
-                version = version.replace(/^1\./, '');
-
-                if (version === "NAO_DECLARADA") {
-                  result = "ABAIXO";
-                } else if (version < javaMin) {
-                  result = "ABAIXO_MINIMO";
-                } else if (version < javaTarget) {
-                  result = "ABAIXO_TARGET";
-                } else {
-                  result = "OK";
+  
+                const paths = tree.data.tree.map(t => t.path);
+  
+                // ---------------- JAVA ----------------
+                const pomPath = paths.find(p => p === "pom.xml") || paths.find(p => p.includes("pom.xml"));
+  
+                if (pomPath && !techDetected) {
+                  techDetected = true;
+                  language = "Java";
+                  baselineMin = javaMin;
+                  baselineTarget = javaTarget;
+  
+                  const file = await github.rest.repos.getContent({
+                    owner: org,
+                    repo,
+                    path: pomPath,
+                    ref: branch
+                  });
+  
+                  const content = Buffer.from(file.data.content, 'base64').toString();
+  
+                  const extract = (regex) => {
+                    const match = content.match(regex);
+                    return match ? match[1] : null;
+                  };
+  
+                  version =
+                    extract(/<java.version>(.*?)<\/java.version>/) ||
+                    extract(/<maven.compiler.release>(.*?)<\/maven.compiler.release>/) ||
+                    extract(/<maven.compiler.source>(.*?)<\/maven.compiler.source>/) ||
+                    extract(/<maven.compiler.target>(.*?)<\/maven.compiler.target>/) ||
+                    extract(/<source>(.*?)<\/source>/) ||
+                    extract(/<target>(.*?)<\/target>/) ||
+                    "NAO_DECLARADA";
+  
+                  version = version.replace(/^1\./, '');
+  
+                  if (version === "NAO_DECLARADA") {
+                    result = "ABAIXO";
+                  } else if (version < javaMin) {
+                    result = "ABAIXO_MINIMO";
+                  } else if (version < javaTarget) {
+                    result = "ABAIXO_TARGET";
+                  } else {
+                    result = "OK";
+                  }
                 }
-              }
-
-              // -------- JAVA LEGACY --------
-              if (!techDetected && paths.some(p => p.endsWith('.java'))) {
-                techDetected = true;
-                language = "Java-LEGACY";
-                baselineMin = javaMin;
-                baselineTarget = javaTarget;
-                result = "ABAIXO";
-              }
-
-              // ---------------- DOTNET ----------------
-              const csproj = paths.find(p =>
-                p.endsWith(".csproj") &&
-                !p.startsWith(".github/") &&
-                !p.startsWith("docs/") &&
-                !p.startsWith("scripts/")
-              );
-
-              if (csproj && !techDetected) {
-                techDetected = true;
-                language = ".NET";
-                baselineMin = dotnetMin;
-                baselineTarget = dotnetTarget;
-
-                const file = await github.rest.repos.getContent({
-                  owner: org,
-                  repo,
-                  path: csproj,
-                  ref: branch
-                });
-
-                const content = Buffer.from(file.data.content, 'base64').toString();
-
-                const match = content.match(/<TargetFramework>net([0-9.]+)<\/TargetFramework>/);
-                version = match ? match[1].replace(/\.0$/, '') : "NAO_DECLARADA";
-
-                if (version === "NAO_DECLARADA") {
+  
+                // -------- JAVA LEGACY --------
+                if (!techDetected && paths.some(p => p.endsWith('.java'))) {
+                  techDetected = true;
+                  language = "Java-LEGACY";
+                  baselineMin = javaMin;
+                  baselineTarget = javaTarget;
                   result = "ABAIXO";
-                } else if (version < dotnetMin) {
-                  result = "ABAIXO_MINIMO";
-                } else if (version < dotnetTarget) {
-                  result = "ABAIXO_TARGET";
-                } else {
-                  result = "OK";
                 }
+  
+                // ---------------- DOTNET ----------------
+                const csproj = paths.find(p =>
+                  p.endsWith(".csproj") &&
+                  !p.startsWith(".github/") &&
+                  !p.startsWith("docs/") &&
+                  !p.startsWith("scripts/")
+                );
+  
+                if (csproj && !techDetected) {
+                  techDetected = true;
+                  language = ".NET";
+                  baselineMin = dotnetMin;
+                  baselineTarget = dotnetTarget;
+  
+                  const file = await github.rest.repos.getContent({
+                    owner: org,
+                    repo,
+                    path: csproj,
+                    ref: branch
+                  });
+  
+                  const content = Buffer.from(file.data.content, 'base64').toString();
+  
+                  const match = content.match(/<TargetFramework>net([0-9.]+)<\/TargetFramework>/);
+                  version = match ? match[1].replace(/\.0$/, '') : "NAO_DECLARADA";
+  
+                  if (version === "NAO_DECLARADA") {
+                    result = "ABAIXO";
+                  } else if (version < dotnetMin) {
+                    result = "ABAIXO_MINIMO";
+                  } else if (version < dotnetTarget) {
+                    result = "ABAIXO_TARGET";
+                  } else {
+                    result = "OK";
+                  }
+                }
+  
+                fs.appendFileSync(
+                  csvPath,
+                  `${org},${repo},${language},${version},${baselineMin},${baselineTarget},${result},${dataExecucao}\n`
+                );
               }
-
-              fs.appendFileSync(
-                csvPath,
-                `${org},${repo},${language},${version},${baselineMin},${baselineTarget},${result},${dataExecucao}\n`
-              );
-            }
 
       - name: Upload CSV
         uses: actions/upload-artifact@v4
